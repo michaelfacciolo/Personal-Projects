@@ -25,7 +25,7 @@ def compound_interest(P, r, n, t, PMT):
     return P * (1 + r/n)**(n*t) + (PMT * (((1 + r/n)**(n*t) - 1) / (r/n)))
 
 def main():
-    print("📈 Welcome to the Compound Interest Calculator!\n")
+    print("Welcome to the Compound Interest Calculator!\n")
 
     # Get user inputs
     age = get_positive_int("Enter your current age: ", min_value=0)
