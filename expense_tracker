@@ -1,0 +1,117 @@
+import json
+import os
+from typing import List, Dict, Optional
+
+EXPENSES_FILE = "expenses.json"
+
+
+def load_expenses() -> List[Dict[str, float]]:
+    """Load expenses from a JSON file with robust error handling."""
+    if os.path.exists(EXPENSES_FILE):
+        try:
+            with open(EXPENSES_FILE, "r", encoding="utf-8") as file:
+                data = json.load(file)
+                if isinstance(data, list):
+                    return data
+                print("Corrupt data detected. Starting fresh.")
+        except (json.JSONDecodeError, IOError) as e:
+            print(f"Error reading the expenses file: {e}. Starting fresh.")
+    return []
+
+
+def save_expenses(expenses: List[Dict[str, float]]) -> None:
+    """Save expenses to a JSON file with error handling."""
+    try:
+        with open(EXPENSES_FILE, "w", encoding="utf-8") as file:
+            json.dump(expenses, file, indent=4)
+    except IOError as e:
+        print(f"Error saving expenses: {e}")
+
+
+def get_valid_float(prompt: str) -> float:
+    """Prompt the user for a valid float input with error handling."""
+    while True:
+        try:
+            return float(input(prompt).strip())
+        except ValueError:
+            print("Invalid input. Please enter a valid number.")
+
+
+def add_expense(expenses: List[Dict[str, float]]) -> None:
+    """Add a new expense."""
+    description = input("Enter the expense description: ").strip()
+    amount = get_valid_float("Enter the expense amount: ")
+    expenses.append({"description": description, "amount": round(amount, 2)})
+    save_expenses(expenses)
+    print("Expense added successfully!")
+
+
+def view_expenses(expenses: List[Dict[str, float]], tail: Optional[int] = None) -> None:
+    """View all expenses or only the last few expenses."""
+    if not expenses:
+        print("No expenses found.")
+        return
+    
+    print("\nExpenses:")
+    expenses_to_show = expenses[-tail:] if tail else expenses
+    for i, expense in enumerate(expenses_to_show, 1):
+        print(f"{i}. {expense['description']} - ${expense['amount']:.2f}")
+    total = sum(expense['amount'] for expense in expenses)
+    print(f"\nTotal expenses: ${total:.2f}")
+
+
+def get_valid_index(prompt: str, max_index: int) -> int:
+    """Prompt the user for a valid index within the given range."""
+    while True:
+        try:
+            index = int(input(prompt).strip()) - 1
+            if 0 <= index < max_index:
+                return index
+            print("Invalid choice. Please enter a valid number.")
+        except ValueError:
+            print("Invalid input. Please enter a number.")
+
+
+def delete_expense(expenses: List[Dict[str, float]]) -> None:
+    """Delete an expense."""
+    if not expenses:
+        print("No expenses to delete.")
+        return
+    
+    view_expenses(expenses)
+    index = get_valid_index("Enter the expense number to delete: ", len(expenses))
+    removed_expense = expenses.pop(index)
+    save_expenses(expenses)
+    print(f"Deleted expense: {removed_expense['description']} - ${removed_expense['amount']:.2f}")
+
+
+def main() -> None:
+    """Main function to run the expense tracker."""
+    print("Welcome to the Expense Tracker!")
+    expenses = load_expenses()
+
+    menu_options = {
+        "1": ("Add Expense", lambda: add_expense(expenses)),
+        "2": ("View All Expenses", lambda: view_expenses(expenses)),
+        "3": ("View Last 5 Expenses", lambda: view_expenses(expenses, tail=5)),
+        "4": ("Delete Expense", lambda: delete_expense(expenses)),
+        "5": ("Exit", lambda: print("Goodbye!"))
+    }
+
+    while True:
+        print("\nMenu:")
+        for key, (desc, _) in menu_options.items():
+            print(f"{key}. {desc}")
+        choice = input("Enter your choice: ").strip()
+
+        if choice == "5":
+            print("Goodbye!")
+            break
+        elif choice in menu_options:
+            menu_options[choice][1]()
+        else:
+            print("Invalid choice. Please enter a valid option.")
+
+
+if __name__ == "__main__":
+    main()
