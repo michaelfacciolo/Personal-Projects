@@ -1,0 +1,65 @@
+import requests
+from urllib.parse import urlparse
+from datetime import datetime
+
+# Replace with your own API key
+NEWS_API_KEY = '9d2e33d8287b45c1bbc90c2b8e60add2'
+API_URL = 'https://newsapi.org/v2/everything'
+
+
+def fetch_articles(keyword, page_size=15):
+    """Fetch top articles for a given keyword."""
+    params = {
+        'q': keyword,
+        'apiKey': NEWS_API_KEY,
+        'pageSize': page_size,
+        'sortBy': 'publishedAt'
+    }
+    try:
+        response = requests.get(API_URL, params=params)
+        response.raise_for_status()
+        return response.json().get('articles', [])
+    except requests.RequestException as e:
+        print(f"Error fetching articles: {e}")
+        return []
+
+
+def format_article(article, index):
+    """Format a single article for display."""
+    parsed_url = urlparse(article.get('url', ''))
+    domain = parsed_url.netloc or 'Unknown'
+    date_str = article.get('publishedAt', '')
+    formatted_date = datetime.strptime(date_str, "%Y-%m-%dT%H:%M:%SZ").strftime("%B %d, %Y") if date_str else 'Unknown'
+    
+    return (
+        f"{index}. \033]8;;{article.get('url', '#')}\033\\{article.get('title', 'No Title')}\033]8;;\033\\\n"
+        f"   Source: {article.get('source', {}).get('name', 'Unknown')} ({domain})\n"
+        f"   Date: {formatted_date}\n"
+        f"   URL: {article.get('url', 'N/A')}\n"
+        f"   Description: {article.get('description', 'No description available')}\n"
+    )
+
+
+def display_articles(articles):
+    """Display formatted articles."""
+    if not articles:
+        print("No articles found.")
+        return
+    
+    for index, article in enumerate(articles, start=1):
+        print(format_article(article, index))
+
+
+def main():
+    print("Welcome to the News Articles Fetcher!")
+    keyword = input("Enter a keyword to search for articles: ").strip()
+    if not keyword:
+        print("Keyword cannot be empty.")
+        return
+    
+    articles = fetch_articles(keyword)
+    display_articles(articles)
+
+
+if __name__ == "__main__":
+    main()
