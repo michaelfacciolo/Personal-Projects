@@ -1,64 +1,107 @@
+import os
 import requests
+import logging
 from urllib.parse import urlparse
 from datetime import datetime
+from typing import List, Dict, Optional
 
-# Replace with your own API key
-NEWS_API_KEY = '9d2e33d8287b45c1bbc90c2b8e60add2'
+# Load API Key from environment variable for security
+NEWS_API_KEY = os.getenv('NEWS_API_KEY', '9d2e33d8287b45c1bbc90c2b8e60add2')
 API_URL = 'https://newsapi.org/v2/everything'
 
+# Configure logging for debugging
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
-def fetch_articles(keyword, page_size=15):
-    """Fetch top articles for a given keyword."""
+
+def fetch_articles(keyword: str, page: int = 1, page_size: int = 10) -> List[Dict]:
+    """Fetch top articles for a given keyword with robust error handling."""
     params = {
         'q': keyword,
         'apiKey': NEWS_API_KEY,
         'pageSize': page_size,
-        'sortBy': 'publishedAt'
+        'page': page,
+        'sortBy': 'publishedAt',
+        'language': 'en'
     }
+    
     try:
-        response = requests.get(API_URL, params=params)
+        response = requests.get(API_URL, params=params, timeout=10)
         response.raise_for_status()
-        return response.json().get('articles', [])
-    except requests.RequestException as e:
-        print(f"Error fetching articles: {e}")
-        return []
+        data = response.json()
 
+        if data.get("status") != "ok":
+            logging.error(f"API Error: {data.get('message', 'Unknown error')}")
+            print(f"❌ API Error: {data.get('message', 'Unknown error')}")
+            return []
 
-def format_article(article, index):
-    """Format a single article for display."""
-    parsed_url = urlparse(article.get('url', ''))
-    domain = parsed_url.netloc or 'Unknown'
-    date_str = article.get('publishedAt', '')
-    formatted_date = datetime.strptime(date_str, "%Y-%m-%dT%H:%M:%SZ").strftime("%B %d, %Y") if date_str else 'Unknown'
+        return data.get('articles', [])
+
+    except requests.exceptions.Timeout:
+        logging.error("❌ API request timed out.")
+        print("❌ Error: The request took too long to complete.")
+    except requests.exceptions.RequestException as e:
+        logging.error(f"❌ API request failed: {e}")
+        print(f"❌ Error fetching articles: {e}")
     
-    return (
-        f"{index}. \033]8;;{article.get('url', '#')}\033\\{article.get('title', 'No Title')}\033]8;;\033\\\n"
-        f"   Source: {article.get('source', {}).get('name', 'Unknown')} ({domain})\n"
-        f"   Date: {formatted_date}\n"
-        f"   URL: {article.get('url', 'N/A')}\n"
-        f"   Description: {article.get('description', 'No description available')}\n"
-    )
+    return []
 
 
-def display_articles(articles):
-    """Display formatted articles."""
+def format_article(article: Dict, index: int) -> str:
+    """Format a single article for display with error handling."""
+    try:
+        parsed_url = urlparse(article.get('url', ''))
+        domain = parsed_url.netloc or 'Unknown'
+        date_str = article.get('publishedAt', '')
+        formatted_date = datetime.strptime(date_str, "%Y-%m-%dT%H:%M:%SZ").strftime("%B %d, %Y") if date_str else 'Unknown'
+        
+        return (
+            f"{index}. \033]8;;{article.get('url', '#')}\033\\{article.get('title', 'No Title')}\033]8;;\033\\\n"
+            f"   📰 **Source:** {article.get('source', {}).get('name', 'Unknown')} ({domain})\n"
+            f"   📅 **Date:** {formatted_date}\n"
+            f"   🔗 **URL:** {article.get('url', 'N/A')}\n"
+            f"   📝 **Description:** {article.get('description', 'No description available')}\n"
+        )
+    except Exception as e:
+        logging.error(f"❌ Error formatting article: {e}")
+        return f"{index}. ❌ Error formatting this article."
+
+
+def display_articles(articles: List[Dict]) -> None:
+    """Display formatted articles in a structured way."""
     if not articles:
-        print("No articles found.")
+        print("🔍 No articles found for this keyword. Try another search.")
         return
-    
+
     for index, article in enumerate(articles, start=1):
         print(format_article(article, index))
 
 
-def main():
-    print("Welcome to the News Articles Fetcher!")
-    keyword = input("Enter a keyword to search for articles: ").strip()
+def paginate_articles(keyword: str) -> None:
+    """Handles paginated fetching of articles."""
+    page = 1
+    while True:
+        articles = fetch_articles(keyword, page=page)
+        if not articles:
+            return
+        
+        display_articles(articles)
+
+        user_input = input("\n🔄 Load more results? (yes/no): ").strip().lower()
+        if user_input not in ['yes', 'y']:
+            break
+        page += 1
+
+
+def main() -> None:
+    """Main function to run the News Articles Fetcher."""
+    print("📰 Welcome to the News Articles Fetcher!")
+    keyword = input("🔎 Enter a keyword to search for articles: ").strip()
+    
     if not keyword:
-        print("Keyword cannot be empty.")
+        print("❌ Keyword cannot be empty. Please enter a valid search term.")
         return
     
-    articles = fetch_articles(keyword)
-    display_articles(articles)
+    paginate_articles(keyword)
 
 
 if __name__ == "__main__":
